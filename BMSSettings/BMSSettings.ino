@@ -29,35 +29,128 @@ void setup() {
 
 	//putEepromByte(0x25, 0);
 	//putEepromByte(0x04 + 5, 0); // 1.22);
-	for (uint8_t readWordAddress = 0; readWordAddress <= 127; readWordAddress++) {
-		// dump eeprom
-		Serial.print(getEepromByte(readWordAddress), HEX);
-		Serial.print(" ");
-	}
 
-	Serial.println("Password: ");
-	Serial.print(getEepromByte(0x7E), HEX);
-	Serial.print(" ");
-	Serial.print(getEepromByte(0x7D), HEX);
-	Serial.print(" ");
+	// password: 2C B8 (from cowboy software)
+	// input password:
+	/*setRegister(0x69, 0x2C);
+	setRegister(0x6A, 0xB8);*/
 }
 
 
 
 void loop() {
 	
-	//displayStatus();
+	Serial.println();
+	Serial.println();
+	Serial.println();
 
-	displaySettings();
-
-	//Serial.println("MAIN MENU");
+	Serial.println("MAIN MENU");
 	//Serial.pr
+	Serial.println("1. Show status");
+	Serial.println("2. Show settings");
+	Serial.println("3. Dump EEPROM");
+	Serial.println("4. Show password");
+	Serial.println("5. Set password");
+	Serial.println("6. Start pwd authentication");
+	Serial.println("7. Stop pwd authentication");
+	Serial.println("8. Enable EEPROM access");
+	Serial.println("9. Zero calib data on cell 1");
 
-
-	delay(2000);
+	char c;
+	while (Serial.available() == 0);
+	Serial.println();
+	Serial.println();
+	c = Serial.read();
+	switch (c) {
+	case '1': displayStatus(); break;
+	case '2': displaySettings(); break;
+	case '3': dumpEEProm(); break;
+	case '4': showPassword(); break;
+	case '5': setPassword(); break;
+	case '6': startAuth(); break;
+	case '7': stopAuth(); break;
+		//	case '8': ATE_UNFRZ(); break;
+	case '8': enableEepromWrite(); break;
+	case '9': writeCalib(); break;
+	}
 }
 
+void writeCalib() {
+	putEepromByte(0x05, 0);
+}
 
+void enableEepromWrite() {
+	//putEepromByte(0x25, 0); // reset ATE_FRZ
+	//putEepromByte(0x04 + 5, 0);
+	uint8_t byte = getEepromByte(0x33);
+	byte = byte & 0b00111111; // zero bits 7 and 6, to allow eeprom access
+	Serial.print(("\nUC01:   "));
+	Serial.print(byte, BIN);
+	sendStatusBit(byte & (1 << 7));
+	sendStatusBit(byte & (1 << 6));
+	putEepromByte(0x33, byte);
+}
+
+void dumpEEProm() {
+	for (uint8_t readWordAddress = 0; readWordAddress <= 127; readWordAddress++) {
+		// dump eeprom
+		Serial.print(getEepromByte(readWordAddress), HEX);
+		Serial.print(" ");
+	}
+}
+
+void startAuth() {
+	setRegister(0x5F, 0b1010000);
+	setPassword();
+
+	
+	//Serial.println(getRegister(0x5F),BIN);
+
+	showPassword();
+}
+void stopAuth() {
+	setRegister(0x5F, 0000);
+}
+
+void setPassword() {
+	setRegister(0x69, 0xB8);
+	setRegister(0x6A, 0x2C);
+}
+
+void showPassword() {
+
+	uint8_t byte = getEepromByte(0x6F);
+	Serial.print(("\nPWD_OK:   "));
+	sendStatusBit(byte & (1 << 7));
+	Serial.print(("\nPWD_FAIL:   "));
+	sendStatusBit(byte & (1 << 6));
+	Serial.print(("\nPWD_BUSY:   "));
+	sendStatusBit(byte & (1 << 5));
+
+	Serial.print("Password: ");
+	Serial.print(getEepromByte(0x7A), HEX);
+	Serial.print(" ");
+	Serial.print(getEepromByte(0x7B), HEX);
+	Serial.println(" ");
+	
+	Serial.print("EEPROM Status: ");
+	Serial.println(getRegister(0x5F), BIN);
+
+	byte = getEepromByte(0x25);
+	Serial.print(("\nATE_FRZ:   "));
+	sendStatusBit(byte & (1 << 7));
+
+	byte = getEepromByte(0x7F);
+	Serial.print(("\nSTFRZ:   "));
+	sendStatusBit(byte & (1 << 7));
+
+	byte = getEepromByte(0x33);
+	Serial.print(("\nUC01:   "));
+	Serial.print(byte, BIN);
+	Serial.print("   ");
+	sendStatusBit(byte & (1 << 7));
+	sendStatusBit(byte & (1 << 6));
+}
 
 void displayStatus() {
 	uint8_t byte;
@@ -76,13 +169,13 @@ void displayStatus() {
 		uint16_t cellVoltage = getCellVoltage(i);
 		packVoltage += cellVoltage;
 
-		Serial.print(String(cellVoltage / 1000.0,3));
+		Serial.print(String(cellVoltage / 1000.0 ,3));
 		Serial.print(" V\t");
 
 		Serial.print(" Offset: ");
-		Serial.print(getEepromByte(0x05 + i - 1)*1.22);
+		Serial.print((int8_t)getEepromByte(0x05 + i - 1)*1.22);
 		Serial.print(" mV\t");
-		Serial.print(getEepromByte(0x05 + i - 1));
+		Serial.print((int8_t)getEepromByte(0x05 + i - 1));
 		Serial.print(" raw");
 
 		//if (!(i % 4)) 
@@ -100,7 +193,7 @@ void displayStatus() {
 	Serial.print(("\tDischarge: "));
 	sendStatusBit(byte & (1 << 2));
 	Serial.print("\r\nActual current: ");
-	Serial.print(getCurrent());
+	Serial.print(getCurrent()/1000);
 	Serial.print("\r\nSense Resistor:");
 	Serial.print(senseResistor/10.0);
 	Serial.print(" mOhm");
@@ -226,10 +319,10 @@ void displaySettings() {
 		Serial.print((char)getEepromByte(i));
 	}
 
-	Serial.print(("\r\n(u) Project Name: "));
+	/*Serial.print(("\r\n(u) Project Name: "));
 	for (uint8_t i = 0x40; i <= 0x44; i++) {
 		Serial.print((char)getEepromByte(i));
-	}
+	}*/
 
 	Serial.print(("\r\n(v) Version Number: "));
 	Serial.print(getEepromByte(0x45));
@@ -254,6 +347,7 @@ void displaySettings() {
 	sendStatusBit(byte & (1 << 6));
 	Serial.print(("\nPWD_BUSY:   "));
 	sendStatusBit(byte & (1 << 5));
+
 
 }
 

@@ -1,4 +1,5 @@
 //#define espdisable
+//#define debug
 
 #include <UTFT.h>
 #include <UTouch.h>
@@ -32,18 +33,21 @@ const double cellMin = 2.7;
 const double cellMax = 4.2;
 
 void setup() {
-	/*Serial.begin(115200);
-	#ifdef __AVR_ATmega2560__
+#ifdef debug
+	Serial.begin(115200);
+#endif
+	/*#ifdef __AVR_ATmega2560__
 		Serial1.begin(115200);
 	#endif
 	*/
+#ifndef debug
 	lcd.InitLCD(PORTRAIT);
 	lcd.clrScr();
 	lcd.setColor(255, 255, 255);
 
 	lcd.setBackColor(0, 0, 0);
 	lcd.setFont(BigFont);
-
+#endif
 }
 
 
@@ -51,6 +55,9 @@ void display(double val, double min, double max) {
 	int d = (240 - 80)* (val - min) / (max-min);
 	String s = String(val).substring(0,4);
 
+#ifdef debug
+	Serial.println(s);
+#else
 	lcd.setColor(255, 255, 127);
 	lcd.drawRect(80, y+5, 80 + d, y + 10);
 	//for (int i = 0; i < 4; i++)
@@ -62,6 +69,7 @@ void display(double val, double min, double max) {
 	lcd.setColor(255, 255, 255);
 	lcd.print(s, 10, y);
 	y += 15;
+#endif
 }
 
 

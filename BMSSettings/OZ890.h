@@ -39,6 +39,8 @@ uint8_t getRegister(uint8_t regAddress) {
 
 uint8_t eepromBusy(void) {
 	uint8_t byte = getRegister(0x5f); // EEPROM Control Register
+	/*if (byte & (1 << 7))
+		Serial.write("B");*/
 	return (byte & (1 << 7)); // bit 7 = busy flag
 }
 
@@ -66,8 +68,8 @@ uint16_t getCellVoltage(uint8_t cell) {
 
 
 void sendStatusBit(uint8_t bit) {
-	if (bit) Serial.write(("yes"));
-	else Serial.write(("no"));
+	if (bit) Serial.write(("yes "));
+	else Serial.write(("no "));
 }
 
 uint8_t getEepromByte(uint8_t address) {
