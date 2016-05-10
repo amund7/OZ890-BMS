@@ -36,10 +36,9 @@ void setup() {
 #ifdef debug
 	Serial.begin(115200);
 #endif
-	/*#ifdef __AVR_ATmega2560__
+//#ifdef __AVR_ATmega2560__ // Since we are in the LCD project, we assume we are on MEGA, and having both LCD + ES8266
 		Serial1.begin(115200);
-	#endif
-	*/
+//#endif
 #ifndef debug
 	lcd.InitLCD(PORTRAIT);
 	lcd.clrScr();
@@ -82,7 +81,7 @@ y = 10;
 //lcd.print("test", 0, y);
 //lcd.clrScr();
 
-for (int cell=0; cell<12; cell++) {
+/*for (int cell=0; cell<12; cell++) {
   int adr = 0x0;         
   adr = 0x32;        
   adr = adr + 2*cell;
@@ -100,7 +99,12 @@ for (int cell=0; cell<12; cell++) {
   vTot+=volt1/1000.0;
   
   display(volt1 / 1000.0, cellMin, cellMax);
+}/**/
 
+for (int i = 0; i < 12; i++) {
+	uint16_t cellVoltage = getCellVoltage(i+1);
+	display(cellVoltage / 1000.0, cellMin, cellMax);
+	//display((cellVoltage + ((int8_t)getEepromByte(0x05 + i - 1)*1.22)) / 1000.0, cellMin, cellMax);
 }
 
 //  UDPSend(s);

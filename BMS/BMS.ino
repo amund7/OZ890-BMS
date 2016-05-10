@@ -9,6 +9,8 @@ double amp,Ah=0;
 long lasttime;
 byte val1,val2,stat1,stat2;
 bool first=true;
+uint16_t correction[12];
+int packetCounter;
 
 
 void setup() {
@@ -20,6 +22,9 @@ void setup() {
 	ATcommand("ATE0","OK");
 	connectWiFi();
 	connectUdp();
+
+	for (int i = 0; i < 12; i++)
+		correction[i] = (int8_t)getEepromByte(0x05 + i)*1.22;
 }
 
 	
@@ -28,7 +33,7 @@ void loop() {
 
 String s;
 
-for (int cell=0; cell<12; cell++) {
+/*for (int cell=0; cell<12; cell++) {
   int adr = 0x0;         
   adr = 0x32;        
   adr = adr + 2*cell;
@@ -46,10 +51,22 @@ for (int cell=0; cell<12; cell++) {
   vTot+=volt1/1000.0;
   
   s+="Cell "+String(cell+1)+":"+String(volt1/1000.0,3)+"\r\n";
+}*/
+for (int i = 0; i < 12; i++) {
+	uint16_t cellVoltage = getCellVoltage(i + 1) +correction[i];
+	//display((cellVoltage + ((int8_t)getEepromByte(0x05 + i - 1)*1.22)) / 1000.0, cellMin, cellMax);
+	s += "Cell " + String(i + 1) + ":" + String((cellVoltage) / 1000.0, 3) + "\r\n";
+	vTot += cellVoltage / 1000.0;
 }
+
 
   UDPSend(s);
   UDPSend("Pack:"+String(vTot,2));
+
+  packetCounter++;
+  if (packetCounter > 100)
+	  packetCounter = 0;
+  //UDPSend("Cnt:" + String(packetCounter));
 
 
   int adr = 0x52;         

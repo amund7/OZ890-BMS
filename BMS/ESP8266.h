@@ -27,32 +27,44 @@ String censor(String s) {
 
 
 int ATcommand(String command,String success="", String failure = "") {
-	String t;
+	String t="";
 	//Serial.println("Sending command '"+censor(command)+"'");
 	//t=censor(Serial.readString());
+#ifdef __AVR_ATmega2560__
+	Serial1.println(command);
+#endif
 	Serial.println(command);
 	if (success=="") {
 		delay(10);
 		return 0;
 	}
-#ifndef espdisable
+//#ifndef espdisable
 	int fails=0;
 	while (fails < 20) {		
-		t=censor(Serial.readStringUntil('\n'));
+#ifdef __AVR_ATmega2560__
+		t+=Serial1.readString();
+#else
+		t+= censor(Serial.readStringUntil('\n'));
+#endif
+
 		if (t.indexOf(success)>=0) {
-			//Serial.println("'"+success+"' found! Returning 0");
+			Serial.println("'"+success+"' found!");
 			return 0;
 		}
 		if (failure!="")
 		if (t.indexOf(failure)>=0) {
-			Serial.println("'"+failure+"' found! Returning 1. Chip said "+censor(t));
+			Serial.println("'"+failure+"' found! Chip said "+censor(t));
 			return 1;
 		}
 		fails++; // we have to give up at some point, maybe we lost a feedback or we're out of sync with the chip
 		//Serial.print(".");
 	}
-	Serial.println(censor(command) + " gave up after "+fails+" tries. Chip said "+censor(t));
+#ifdef __AVR_ATmega2560__
+	Serial.println((command) + " gave up after " + fails + " tries. Chip said " + censor(t));
+#else
+	Serial.println(censor(command) + " gave up after " + fails + " tries. Chip said " + censor(t));
 #endif
+//#endif
 	return 3;
 }
 

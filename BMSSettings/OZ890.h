@@ -92,6 +92,26 @@ uint8_t getEepromByte(uint8_t address) {
 	else return byte2;
 }
 
+uint8_t getEepromByteDontDisable(uint8_t address) {
+	while (eepromBusy()); // wait for eeprom not be busy
+	setRegister(0x5e, address); // set eeprom address to read
+
+	while (eepromBusy());
+	setRegister(0x5f, 0x55); // b01010101 (or 0x55) set eeprom access & word reading mode
+
+	uint8_t byte1, byte2;
+	while (eepromBusy());
+	byte1 = getRegister(0x5d); // odd addr
+	while (eepromBusy());
+	byte2 = getRegister(0x5c); // even addr
+
+	while (eepromBusy());
+	//setRegister(0x5f, 0x00); // disable eeprom access
+
+	if (address % 2) return byte1;
+	else return byte2;
+}
+
 void putEepromByte(uint8_t address, uint8_t data) {
 	while (eepromBusy()); // wait for eeprom not be busy
 	setRegister(0x5c, data); // data to write to eeprom
@@ -107,6 +127,25 @@ void putEepromByte(uint8_t address, uint8_t data) {
 
 	while (eepromBusy());
 	setRegister(0x5f, 0x00); // disable eeprom access
+
+	while (eepromBusy());
+}
+
+void putEepromByteDontDisable(uint8_t address, uint8_t data) {
+	while (eepromBusy()); // wait for eeprom not be busy
+	setRegister(0x5c, data); // data to write to eeprom
+
+	while (eepromBusy());
+	setRegister(0x5e, address); // set eeprom address to write
+
+	while (eepromBusy());
+	setRegister(0x5f, 0x5B); // eeprom byte write
+
+							 //while (eepromBusy());
+							 //setRegister(0x5f, 0x5A); // eeprom mapping
+
+							 //while (eepromBusy());
+							 //setRegister(0x5f, 0x00); // disable eeprom access
 
 	while (eepromBusy());
 }

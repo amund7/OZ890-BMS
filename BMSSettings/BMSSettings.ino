@@ -36,7 +36,22 @@ void setup() {
 	setRegister(0x6A, 0xB8);*/
 }
 
-
+uint8_t eeprombuffer[128];
+uint16_t currentOffset[12];
+uint16_t calibrated[12] = {
+	4180,
+	4170,
+	4170,
+	4170,
+	4170,
+	4170, // 6
+	4170,
+	4170,
+	4170,
+	4160,
+	4160,
+	4160
+};
 
 void loop() {
 	
@@ -55,6 +70,10 @@ void loop() {
 	Serial.println("7. Stop pwd authentication");
 	Serial.println("8. Enable EEPROM access");
 	Serial.println("9. Zero calib data on cell 1");
+	Serial.println("a. Show raw voltages (w/o calibration)");
+	Serial.println("b. Do whole EEPROM reset song and dance");
+	Serial.println("c. Reset password");
+	Serial.println("d. Print calculated calibration values");
 
 	char c;
 	while (Serial.available() == 0);
@@ -72,18 +91,74 @@ void loop() {
 		//	case '8': ATE_UNFRZ(); break;
 	case '8': enableEepromWrite(); break;
 	case '9': writeCalib(); break;
+	case 'a': analyzeCalib(); break;
+	case 'b': eepromSongAndDance(); break;
+	case 'c': resetPassword(); break;
+	case 'd': testCalib(); break;
 	}
 }
+
+int8_t calib(int actualVoltage, int calibratedVoltage) {
+	int val = (actualVoltage-calibratedVoltage) / 1.22;
+	if (val > 127) val = 127;
+	if (val < -128) val = -128;
+	return val;
+}
+
+void testCalib() {
+	for (int i = 0; i < 12; i++) 
+		Serial.println(calib(getCellVoltage(i+1),calibrated[i]));
+}
+
+void eepromSongAndDance() {
+
+	dumpEEProm();
+
+	while (eepromBusy()); // wait for eeprom not be busy
+
+	//setRegister(0x5f, 0x5A); 
+	// authenticate
+	//setPassword();
+
+
+	Serial.println("Block erase...");
+	setRegister(0x5f, 0b1010011); // block erase!
+	while (eepromBusy());
+
+	Serial.println("Mapping...");
+	setRegister(0x5f, 0b1011010); // eeprom unfreeze / mapping / block read
+
+	Serial.println("Reverse dump...");
+	reverseDumpEEProm();
+
+	for (int i = 0; i < 12; i++)
+		putEepromByteDontDisable(0x05 + i, 
+			calib(getCellVoltage(i + 1)+(int8_t)getEepromByteDontDisable(0x05+i)*1.22, 
+				calibrated[i]));
+
+	while (eepromBusy());
+	Serial.println("Mapping...");
+	setRegister(0x5f, 0x5A); // eeprom mapping
+
+	while (eepromBusy());
+	setRegister(0x5f, 0x00); // disable eeprom access
+
+	while (eepromBusy());
+	Serial.println("Done.");
+}
+
 
 void writeCalib() {
 	putEepromByte(0x05, 0);
 }
 
 void enableEepromWrite() {
-	//putEepromByte(0x25, 0); // reset ATE_FRZ
+	putEepromByte(0x25, 0); // reset ATE_FRZ
 	//putEepromByte(0x04 + 5, 0);
 	uint8_t byte = getEepromByte(0x33);
 	byte = byte & 0b00111111; // zero bits 7 and 6, to allow eeprom access
+	byte +=       0b01000000; // without this one we disable the scan! meaning no voltages or current are updated
+							  // could have burned 2 lipos today, took a ride, but no voltages changed. probably wouldnt shut down when empty either
 	Serial.print(("\nUC01:   "));
 	Serial.print(byte, BIN);
 	sendStatusBit(byte & (1 << 7));
@@ -91,23 +166,51 @@ void enableEepromWrite() {
 	putEepromByte(0x33, byte);
 }
 
-void dumpEEProm() {
+void reverseDumpEEProm() {
+	uint8_t b;
 	for (uint8_t readWordAddress = 0; readWordAddress <= 127; readWordAddress++) {
 		// dump eeprom
-		Serial.print(getEepromByte(readWordAddress), HEX);
+		Serial.print(eeprombuffer[readWordAddress], HEX);
 		Serial.print(" ");
+		// store it
+		putEepromByteDontDisable(readWordAddress, eeprombuffer[readWordAddress]);
+	}
+}
+
+void dumpEEProm() {
+	uint8_t b;
+	for (uint8_t readWordAddress = 0; readWordAddress <= 127; readWordAddress++) {
+		// dump eeprom
+		Serial.print(b=getEepromByte(readWordAddress), HEX);
+		Serial.print(" ");
+		// store it
+		eeprombuffer[readWordAddress] = b;
 	}
 }
 
 void startAuth() {
 	setRegister(0x5F, 0b1010000);
+	while (eepromBusy());
 	setPassword();
 
-	
+
+	for (int i = 0; i < 10; i++) {
+		uint8_t byte = getRegister(0x6F);
+		Serial.print(("\nPWD_FAIL:   "));
+		sendStatusBit(byte & (1 << 7));
+		Serial.print(("\nPWD_OK:   "));
+		sendStatusBit(byte & (1 << 6));
+		Serial.print(("\nPWD_BUSY:   "));
+		sendStatusBit(byte & (1 << 5));
+		//if (i==1)
+			//setPassword();
+	}
+
 	//Serial.println(getRegister(0x5F),BIN);
 
-	showPassword();
+	//showPassword();
 }
+
 void stopAuth() {
 	setRegister(0x5F, 0000);
 }
@@ -117,39 +220,75 @@ void setPassword() {
 	setRegister(0x6A, 0x2C);
 }
 
+void resetPassword() {
+	setRegister(0x69, 0x00);
+	setRegister(0x6A, 0x00);
+}
+
 void showPassword() {
 
-	uint8_t byte = getEepromByte(0x6F);
-	Serial.print(("\nPWD_OK:   "));
-	sendStatusBit(byte & (1 << 7));
+	uint8_t byte = getRegister(0x6F);
 	Serial.print(("\nPWD_FAIL:   "));
+	sendStatusBit(byte & (1 << 7));
+	Serial.print(("\nPWD_OK:   "));
 	sendStatusBit(byte & (1 << 6));
 	Serial.print(("\nPWD_BUSY:   "));
 	sendStatusBit(byte & (1 << 5));
+	Serial.println();
 
-	Serial.print("Password: ");
-	Serial.print(getEepromByte(0x7A), HEX);
-	Serial.print(" ");
-	Serial.print(getEepromByte(0x7B), HEX);
-	Serial.println(" ");
-	
 	Serial.print("EEPROM Status: ");
 	Serial.println(getRegister(0x5F), BIN);
 
-	byte = getEepromByte(0x25);
+	Serial.println();
+	Serial.print("Password: ");
+	Serial.print(getEepromByteDontDisable(0x7A), HEX);
+	Serial.print(" ");
+	Serial.print(getEepromByteDontDisable(0x7B), HEX);
+	Serial.println(" ");
+	
+	byte = getEepromByteDontDisable(0x25);
 	Serial.print(("\nATE_FRZ:   "));
 	sendStatusBit(byte & (1 << 7));
 
-	byte = getEepromByte(0x7F);
+	byte = getEepromByteDontDisable(0x7F);
 	Serial.print(("\nSTFRZ:   "));
 	sendStatusBit(byte & (1 << 7));
 
-	byte = getEepromByte(0x33);
+	byte = getEepromByteDontDisable(0x33);
 	Serial.print(("\nUC01:   "));
 	Serial.print(byte, BIN);
 	Serial.print("   ");
 	sendStatusBit(byte & (1 << 7));
 	sendStatusBit(byte & (1 << 6));
+}
+
+void analyzeCalib() {
+	uint8_t byte;
+
+	// new page
+	Serial.print(("\r\n"));
+
+	Serial.print(("Voltages\r\n--------\r\n"));
+	for (uint8_t i = 1; i <= 12; i++) {
+		Serial.print(("Cell"));
+		Serial.print(i);
+		Serial.print((": "));
+		if (i < 10) Serial.print(" ");
+
+		uint16_t cellVoltage = getCellVoltage(i);
+
+		Serial.print(String((cellVoltage+ ((int8_t)getEepromByte(0x05 + i - 1)*1.22)) / 1000.0, 3));
+		Serial.print(" V\t");
+
+		Serial.print(" Offset: ");
+		Serial.print((int8_t)getEepromByte(0x05 + i - 1)*1.22);
+		Serial.print(" mV\t");
+		Serial.print((int8_t)getEepromByte(0x05 + i - 1));
+		Serial.print(" raw");
+
+		//if (!(i % 4)) 
+		Serial.print(("\r\n"));
+	}
 }
 
 void displayStatus() {
@@ -322,7 +461,8 @@ void displaySettings() {
 	/*Serial.print(("\r\n(u) Project Name: "));
 	for (uint8_t i = 0x40; i <= 0x44; i++) {
 		Serial.print((char)getEepromByte(i));
-	}*/
+	}*/ 
+	// This one seems to screw up the arduino serial monitor, will not print the following statements
 
 	Serial.print(("\r\n(v) Version Number: "));
 	Serial.print(getEepromByte(0x45));
@@ -340,10 +480,10 @@ void displaySettings() {
 	sendStatusBit(byte & (1 << 7));
 	sendStatusBit(byte & (1 << 6));
 
-	byte = getEepromByte(0x6F);
-	Serial.print(("\nPWD_OK:   "));
-	sendStatusBit(byte & (1 << 7));
+	byte = getRegister(0x6F);
 	Serial.print(("\nPWD_FAIL:   "));
+	sendStatusBit(byte & (1 << 7));
+	Serial.print(("\nPWD_OK:   "));
 	sendStatusBit(byte & (1 << 6));
 	Serial.print(("\nPWD_BUSY:   "));
 	sendStatusBit(byte & (1 << 5));
