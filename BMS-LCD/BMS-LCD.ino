@@ -105,6 +105,7 @@ for (int i = 0; i < 12; i++) {
 	uint16_t cellVoltage = getCellVoltage(i+1);
 	display(cellVoltage / 1000.0, cellMin, cellMax);
 	//display((cellVoltage + ((int8_t)getEepromByte(0x05 + i - 1)*1.22)) / 1000.0, cellMin, cellMax);
+	vTot += cellVoltage / 1000;
 }
 
 //  UDPSend(s);
