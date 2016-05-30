@@ -8,7 +8,7 @@ int i2cadr = 0x30;
 byte senseResistor=0;
 
 
-int read(int reg) {
+/*int read(int reg) {
 	byte val1, val2, stat1, stat2;
 	Wire.beginTransmission(i2cadr);
 	Wire.write(reg);
@@ -22,7 +22,7 @@ int read(int reg) {
 	Serial.println("Word: " + String(((val2 << 8) + val1)) + " " + String(((val2 << 8) + val1), BIN));
 #endif
 	return ((val2 << 8) + val1);
-}
+}*/
 
 
 
@@ -30,10 +30,13 @@ uint8_t getRegister(uint8_t regAddress) {
 	// try send device address (write) and check for errors
 	Wire.beginTransmission(i2cadr);
 	Wire.write(regAddress);
-	Wire.endTransmission(false);
+	Wire.endTransmission(true);
 	Wire.requestFrom(i2cadr, 1);
 	uint8_t byte = Wire.read();
 
+#ifdef debug
+	Serial.println(byte, HEX);
+#endif
 	return byte;
 }
 
@@ -111,19 +114,43 @@ void putEepromByte(uint8_t address, uint8_t data) {
 
 
 // not working as expected
-int16_t getCurrent() {
+double getCurrent() {
 	/*if (!senseResistor)
 		senseResistor = getEepromByte(0x34);
 
 	if (!senseResistor)*/
-		senseResistor = 255;
+		//senseResistor = 255;
+
+	int16_t val = (getRegister(0x55) << 8) | getRegister(0x54);
+
+	int32_t tmp = val;
+	//tmp *= 763;
+	//tmp *= 30.0 / 20.0;
+	//tmp /= 279; //senseResistor;
+				//tmp *= 10;
+	val = tmp;
+	return tmp;
+
+	/*double tmp = val;
+	tmp *= 763;
+	tmp = (double)tmp*30.0 / 20.0;
+	tmp /= 279; //senseResistor;
+	//tmp *= 10;
+	return tmp;*/
+}
+
+int16_t getCurrent2() {
+	if (!senseResistor)
+		senseResistor = getEepromByte(0x34);
+
+	if (!senseResistor)
+		senseResistor = 25;
 
 	int16_t val = (getRegister(0x55) << 8) | getRegister(0x54);
 
 	int32_t tmp = val;
 	tmp *= 763;
-	tmp *= 30.0 / 20.0;
-	tmp /= 279; //senseResistor;
+	tmp /= senseResistor;
 	//tmp *= 10;
 	val = tmp;
 

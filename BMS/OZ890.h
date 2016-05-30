@@ -128,3 +128,22 @@ int16_t getCurrent() {
 
 	return val;
 }
+
+int16_t getCurrent2() {
+	/*if (!senseResistor)
+	senseResistor = getEepromByte(0x34);
+
+	if (!senseResistor)*/
+	//senseResistor = 255;
+
+	int16_t val = (getRegister(0x55) << 8) | getRegister(0x54);
+
+	int32_t tmp = val;
+	tmp *= 763;
+	tmp *= 30.0 / 20.0;
+	tmp /= 279; //senseResistor;
+				//tmp *= 10;
+	val = tmp;
+
+	return val;
+}

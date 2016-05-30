@@ -18,7 +18,7 @@ void setup() {
 	#ifdef __AVR_ATmega2560__
 		Serial1.begin(115200);
 	#endif
-	//ATcommand("AT+RST","ready");
+	ATcommand("AT+RST","ready");
 	ATcommand("ATE0","OK");
 	connectWiFi();
 	connectUdp();

@@ -30,6 +30,7 @@ int ATcommand(String command,String success="", String failure = "") {
 	String t;
 	//Serial.println("Sending command '"+censor(command)+"'");
 	//t=censor(Serial.readString());
+	Serial1.println(command);
 	Serial.println(command);
 	if (success=="") {
 		delay(10);
@@ -38,7 +39,7 @@ int ATcommand(String command,String success="", String failure = "") {
 #ifndef espdisable
 	int fails=0;
 	while (fails < 20) {		
-		t=censor(Serial.readStringUntil('\n'));
+		t=censor(Serial1.readString());
 		if (t.indexOf(success)>=0) {
 			//Serial.println("'"+success+"' found! Returning 0");
 			return 0;
