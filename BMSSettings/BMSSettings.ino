@@ -39,18 +39,18 @@ void setup() {
 uint8_t eeprombuffer[128];
 uint16_t currentOffset[12];
 uint16_t calibrated[12] = {
-	4180,
-	4170,
-	4170,
-	4170,
-	4170,
-	4170, // 6
-	4170,
-	4170,
-	4170,
 	4160,
 	4160,
-	4160
+	4160,
+	4160,
+	4150,
+	4145, // 6
+	4140,
+	4160,
+	4160,
+	4160,
+	4155,
+	4150  // measured battery 5 & 6, 10.9.16
 };
 
 void loop() {
@@ -69,7 +69,6 @@ void loop() {
 	Serial.println("6. Start pwd authentication");
 	Serial.println("7. Stop pwd authentication");
 	Serial.println("8. Enable EEPROM access");
-	Serial.println("9. Zero calib data on cell 1");
 	Serial.println("a. Show raw voltages (w/o calibration)");
 	Serial.println("b. Do whole EEPROM reset song and dance");
 	Serial.println("c. Reset password");
@@ -90,7 +89,6 @@ void loop() {
 	case '7': stopAuth(); break;
 		//	case '8': ATE_UNFRZ(); break;
 	case '8': enableEepromWrite(); break;
-	case '9': writeCalib(); break;
 	case 'a': analyzeCalib(); break;
 	case 'b': eepromSongAndDance(); break;
 	case 'c': resetPassword(); break;
